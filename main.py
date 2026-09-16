@@ -1,10 +1,17 @@
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, Request
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
+
 import fitz
 import numpy as np
 import ollama
 from sentence_transformers import SentenceTransformer
 
+
 app = FastAPI()
+
+# UI templates
+templates = Jinja2Templates(directory="templates")
 
 # Load embedding model once
 model = SentenceTransformer("all-MiniLM-L6-v2")
@@ -14,9 +21,17 @@ stored_chunks = []
 stored_embeddings = []
 
 
-@app.get("/")
-def home():
-    return {"message": "Document Q&A API is running"}
+# ---------------- HOME / UI ----------------
+
+@app.get("/", response_class=HTMLResponse)
+async def home(request: Request):
+    return templates.TemplateResponse(
+        "index.html",
+        {"request": request}
+    )
+
+
+# ---------------- HEALTH CHECK ----------------
 
 @app.get("/health")
 def health_check():
@@ -25,6 +40,8 @@ def health_check():
         "message": "Document Q&A API is running"
     }
 
+
+# ---------------- TEXT CHUNKING ----------------
 
 def split_text(text, chunk_size=1000):
     chunks = []
@@ -36,8 +53,11 @@ def split_text(text, chunk_size=1000):
     return chunks
 
 
+# ---------------- DOCUMENT UPLOAD ----------------
+
 @app.post("/upload")
 async def upload_document(file: UploadFile = File(...)):
+
     global stored_chunks, stored_embeddings
 
     contents = await file.read()
@@ -70,6 +90,8 @@ async def upload_document(file: UploadFile = File(...)):
     }
 
 
+# ---------------- QUESTION ANSWERING ----------------
+
 @app.post("/ask")
 async def ask_question(question: str):
 
@@ -96,7 +118,7 @@ async def ask_question(question: str):
 
         similarities.append(similarity)
 
-    # Find most relevant chunk
+    # Find top 5 relevant chunks
     top_indices = np.argsort(similarities)[-5:][::-1]
 
     relevant_chunks = []
@@ -105,6 +127,7 @@ async def ask_question(question: str):
         relevant_chunks.append(stored_chunks[index])
 
     relevant_chunk = "\n\n".join(relevant_chunks)
+
     # Send retrieved information to Llama
     prompt = f"""
 You are a document question-answering assistant.
@@ -140,8 +163,8 @@ Answer:
     answer = response["message"]["content"]
 
     return {
-    "question": question,
-    "answer": answer,
-    "similarity_score": float(max(similarities)),
-    "sources": relevant_chunks
-}
+        "question": question,
+        "answer": answer,
+        "similarity_score": float(max(similarities)),
+        "sources": relevant_chunks
+    }
