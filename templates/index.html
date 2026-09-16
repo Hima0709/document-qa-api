@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document Q&A Assistant</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f4f7fb;
+            color: #222;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 900px;
+            margin: 40px auto;
+        }
+
+        h1 {
+            text-align: center;
+            color: #1f4e79;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: white;
+            padding: 25px;
+            margin-bottom: 20px;
+            border-radius: 12px;
+            box-shadow: 0 3px 12px rgba(0,0,0,0.08);
+        }
+
+        label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        input[type="file"],
+        input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 15px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+        }
+
+        button {
+            background: #1f4e79;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 15px;
+        }
+
+        button:hover {
+            background: #163a5c;
+        }
+
+        #status {
+            margin-top: 15px;
+            color: #555;
+        }
+
+        .answer {
+            background: #f1f6fb;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 10px;
+            line-height: 1.6;
+        }
+
+        .sources {
+            margin-top: 15px;
+            background: #fafafa;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .source {
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #ddd;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <h1>📄 Document Q&A Assistant</h1>
+    <p class="subtitle">
+        Upload a document and ask questions based on its content
+    </p>
+
+    <div class="card">
+
+        <label>Upload Document</label>
+
+        <input type="file" id="fileInput" accept=".pdf">
+
+        <button onclick="uploadDocument()">
+            Upload Document
+        </button>
+
+        <p id="status"></p>
+
+    </div>
+
+
+    <div class="card">
+
+        <label>Ask a Question</label>
+
+        <input
+            type="text"
+            id="questionInput"
+            placeholder="Example: What technologies were used?"
+        >
+
+        <button onclick="askQuestion()">
+            Ask Question
+        </button>
+
+    </div>
+
+
+    <div class="card">
+
+        <h3>Answer</h3>
+
+        <div id="answer" class="answer">
+            Your answer will appear here.
+        </div>
+
+        <h3>Sources</h3>
+
+        <div id="sources" class="sources">
+            Relevant document content will appear here.
+        </div>
+
+    </div>
+
+</div>
+
+
+<script>
+
+async function uploadDocument() {
+
+    const fileInput = document.getElementById("fileInput");
+    const status = document.getElementById("status");
+
+    if (!fileInput.files.length) {
+        status.innerText = "Please select a PDF file.";
+        return;
+    }
+
+    const formData = new FormData();
+
+    formData.append("file", fileInput.files[0]);
+
+    status.innerText = "Uploading document...";
+
+    try {
+
+        const response = await fetch("/upload", {
+            method: "POST",
+            body: formData
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+
+            status.innerText =
+                "Document uploaded successfully. " +
+                data.total_chunks +
+                " chunks created.";
+
+        } else {
+
+            status.innerText = "Upload failed.";
+
+        }
+
+    } catch (error) {
+
+        status.innerText = "Error connecting to server.";
+
+    }
+}
+
+
+async function askQuestion() {
+
+    const question =
+        document.getElementById("questionInput").value;
+
+    const answerDiv =
+        document.getElementById("answer");
+
+    const sourcesDiv =
+        document.getElementById("sources");
+
+    if (!question.trim()) {
+
+        answerDiv.innerText = "Please enter a question.";
+
+        return;
+    }
+
+    answerDiv.innerText = "Thinking...";
+    sourcesDiv.innerHTML = "";
+
+    try {
+
+        const response = await fetch(
+            "/ask?question=" +
+            encodeURIComponent(question),
+            {
+                method: "POST"
+            }
+        );
+
+        const data = await response.json();
+
+        answerDiv.innerText = data.answer;
+
+        if (data.sources && data.sources.length > 0) {
+
+            data.sources.forEach((source, index) => {
+
+                const div = document.createElement("div");
+
+                div.className = "source";
+
+                div.innerText =
+                    "Source " + (index + 1) + ": " + source;
+
+                sourcesDiv.appendChild(div);
+
+            });
+
+        } else {
+
+            sourcesDiv.innerText =
+                "No sources available.";
+
+        }
+
+    } catch (error) {
+
+        answerDiv.innerText =
+            "Error connecting to server.";
+
+    }
+}
+
+</script>
+
+</body>
+</html>
