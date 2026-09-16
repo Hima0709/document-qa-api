@@ -1,4 +1,8 @@
 fastapi
 uvicorn
-python-multipart
 pymupdf
+numpy
+ollama
+sentence-transformers
+python-multipart
+jinja2
